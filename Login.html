@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title>Welcome to ChatUp</title>
+	<style>
+		* {
+			margin: 0;
+			padding: 0;
+			box-sizing: border-box;
+			border: 5px solid transparent;
+			border-radius: 10px;
+
+		}
+
+		body {
+			font: 15px arial;
+			background-color: rgb(25, 24, 24);
+		}
+
+		form {
+			background: rgb(39, 39, 39);
+			left: 35%;
+			position: fixed;
+			bottom: 40%;
+			width: 30%;
+			color: white;
+			text-align: center;
+			height: 35%;
+
+		}
+
+		form input {
+			border: 2;
+			padding: 10px;
+			width: 50%;
+			margin-right: 1%;
+			background-color: rgb(25, 24, 24);
+			color: white;
+			outline: none;
+			position: static;
+			border: 2px solid rgb(25, 24, 24);
+
+		}
+
+		input:-webkit-autofill,
+		input:-webkit-autofill:hover,
+		input:-webkit-autofill:focus {
+			border: 1px solid rgb(25, 24, 24);
+			-webkit-text-fill-color: white;
+			-webkit-box-shadow: rgb(25, 24, 24);
+			transition: background-color 5000s ease-in-out 0s;
+		}
+
+		form button {
+			width: 30%;
+			background: rgb(25, 24, 24);
+			border: none;
+			padding: 10px;
+			color: white;
+			outline: none;
+
+		}
+
+		::placeholder {
+			color: white;
+
+		}
+	</style>
+</head>
+
+<body>
+
+	<form id="myForm">
+		<br>
+		<h2> Login </h2><br>
+		Username: <input type="text" id="username" name="usr"><br><br>
+		Password: <input type="password" id="password" name="pwd"><br><br><br>
+		<button type="button" id="button" onclick="loginFunction()"> Submit</button>
+		<button type="button" onclick="registerFunction()"> Sign Up</button>
+	</form>
+
+	<script> //Στέλνονται στον server τα credentials για το Login
+	
+		var xhr = new XMLHttpRequest();
+		var globalClientIP;
+
+		//όταν φορτώσει η σελίδα παίρνουμε την ip του client για να σταλεί στον server
+		window.onload = function () {
+			script = document.createElement("script");
+			script.type = "text/javascript";
+			script.src = "https://api.ipify.org?format=jsonp&callback=TimerForVisitors"; 
+			document.getElementsByTagName("head")[0].appendChild(script);
+		};
+
+		//στέλνουμε την ip στον server
+		function TimerForVisitors(clientIP) {
+
+			globalClientIP = clientIP;
+
+			var url = window.location.href + "SetTimerVisitors";
+
+			xhr.open('POST', url, true);
+
+			xhr.onreadystatechange = function () {
+				if (xhr.readyState == 4 && xhr.status == 200) {
+
+					var res = xhr.responseText;
+
+				}
+			};
+
+			xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+
+			var info = clientIP.ip;
+			xhr.send(info);
+		};
+
+
+		// συνάρτηση που τρέχει μόλις πάει να γίνει το Login και στέλνει στον server τα credentials του χρήστη για ταυτοποίηση
+		function loginFunction() {
+
+			var url = window.location.href + "Login";
+
+			xhr.open('POST', url, true);
+
+			xhr.onreadystatechange = function () {
+				if (xhr.readyState == 4 && xhr.status == 200) {
+
+					var res = xhr.responseText;
+
+					if (res == "ok") { // Αν το Login γίνει σωστά ανακατεύθυνση στο UI.html 
+						document.location.href = "UI";
+					}
+					//Αν όχι εμφανίζονται μηνύματα λάθους ανάλογα την περίσταση
+					if (res == "error") {
+						alert("User not found.");
+					}
+					//Αν ο χρήστης έχει μπλοκαριστεί λόγο αδράνειας γίνεται νέο request στον LB για να ξανασυνδεθεί σε server
+					if (res == "error refresh" || res == null) {
+						window.location.href = "http://34.90.45.181:2000";
+					}
+
+				}
+			};
+
+			xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+
+			//αποστολή credentials και ip
+			var info = document.getElementById("username").value + ":" +
+				document.getElementById("password").value + ":" + globalClientIP.ip + ":";
+
+			xhr.send(info);
+		};
+
+		function registerFunction() {
+
+			//ανακατεύθυνση στη σελίδα του Register για εγγραφή χρήστη 
+			document.location.href = "Register";
+
+		};
+
+		//EventListener για να γινεται Submit με το enter button
+		document.getElementById('password').addEventListener('keypress', function (event) {
+			if (event.keyCode == 13) {
+				myFunction();
+			}
+		});
+
+		document.getElementById('username').addEventListener('keypress', function (event) {
+			if (event.keyCode == 13) {
+				myFunction();
+			}
+		});
+
+	</script>
+
+</body>
+
+</html>

@@ -1,0 +1,341 @@
+<!doctype html>
+<html>
+
+<head>
+    <title>ChatUp</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            border: 5px solid transparent;
+            border-radius: 10px;
+        }
+
+        #mytable {
+            text-align: center;
+        }
+
+        body {
+            font: 13px Helvetica, Arial;
+            background-color: rgb(25, 24, 24);
+        }
+
+        ::placeholder {
+            color: white;
+        }
+
+        form {
+            background: rgb(39, 39, 39);
+            left: 15%;
+            position: fixed;
+            bottom: 3%;
+            width: 80%;
+        }
+
+        form input {
+            border: 2;
+            padding: 10px;
+            width: 88%;
+            margin-right: 1%;
+            background-color: rgb(39, 39, 39);
+            color: white;
+            outline: none;
+
+        }
+
+        form button {
+            width: 8%;
+            background: rgb(25, 24, 24);
+            border: none;
+            padding: 10px;
+            color: white;
+
+        }
+
+        #messages {
+            list-style-type: none;
+            margin: 0;
+            padding: 0;
+            color: white;
+
+        }
+
+        #messages li {
+            padding: 5px 10px;
+
+        }
+
+        #messages li:nth-child(odd) {
+            color: white;
+            background: rgb(25, 24, 24);
+
+            ;
+        }
+
+        .tabol {
+            float: left;
+            margin: 1%;
+            color: white;
+
+
+        }
+    </style>
+    <table style="width:12.4%" class="tabol">
+        <tr valign="top">
+            <td bgcolor="#272727" width="22%" height="600" align="right">
+                <center>
+                    <table id="mytable">
+                        <tr>
+                            <th>
+                                Recent Chats
+                                <br><br>
+                            </th>
+                        </tr>
+                        <tr></tr>
+                    </table>
+                </center>
+            </td>
+        </tr>
+
+
+    </table>
+
+</head>
+
+<body>
+
+    <ul id="messages"></ul>
+    <form id="sendForm">
+        <input id="to" autocomplete="off" placeholder="To" /> <button form="sendForm">Send</button>
+        <input id="m" autocomplete="off" placeholder="Type Message..." /> <button form="Logout">Logout</button>
+    </form>
+
+    <form action="/Logout" method="get" id="Logout">
+
+    </form>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://code.jquery.com/jquery-1.11.1.js"></script>
+    <script>
+        var xhr = new XMLHttpRequest();
+        var sender = null;
+        var IP = window.location.host;
+
+        GetUserInfo();// εμφάνιση παλιών συνομιλιών στην οθόνη και αποθήκευση σε πίνακα στο frontend
+        SendButton(); //αποστολή μηνύματος
+        var selectedUser = null;
+        var selectedID = null;
+        var socket;
+        var msg;
+        var socketArray = [];
+
+
+        function socket(ip) { //κάλεσμα όλων των μεθόδων που τρέχουν μέσω web sockets
+            socket = io(ip);
+            SocketMethods();
+
+        };
+
+        function SocketMethods() {
+            var msg;
+
+
+            socket.emit('username', sender); //στέλνουμε στον server το username του αποστολέα
+
+            // Οταν λαμβάνεται μήνυμα εμφανίζεται στην οθόνη
+            socket.on('message received', function (msg) {
+                $('#messages').append($('<li>').text(msg.message));
+                var alreadyHave = false;
+                //Έλεγχος αν η συνομιλία υπάρχει ήδη
+                for (var i = 0; i < usersList.length; i++) {
+                    if (usersList[i][1] == msg.id) {
+                        alreadyHave = true;
+                        break;
+                    }
+                }
+
+                //Αν δεν υπάρχει στον πίνακα με τις πρόσφατες συνομιλίες τότε δημιουργείται καινούργια
+                if (!alreadyHave) {
+                    var newReceivers;
+
+                    newReceivers = msg.receivers.split(",");
+                    newReceivers.splice(newReceivers.indexOf(sender), 1);
+
+                    info = { "users": newReceivers.toString(), "id": msg.id }
+                    AppendChat(info); // η συνομιλία εμφανίζεται στην οθόνη μαζί με τις παλιές και μπαίνει και στον τοπικό πίνακα
+                }
+            });
+
+            // Οταν στέλνεται μηνυμα για πρώτη φορα σε κάποιον
+            socket.on('newChatSender', function (msg) {      
+                AppendChat(msg); // η συνομιλια εμφανίζεται στην οθονη μαζι με τις παλιες και μπαινει και στον τοπικό πινακα
+            });
+
+            //όταν ο client πρέπει να αλλάξει server σβήνουμε το παλιό socket και δημιουργούμε καινούργια σύνδεση
+            socket.on('changeServer', function (ip) {
+                IP = ip;
+                socket.destroy();
+                socket = null;
+               
+                socket = io(IP);
+                SocketMethods();
+            });
+
+            socket.on('error', function () { //μήνυμα λάθους όταν πάει να σταλεί μήνυμα σε χρήστη που δεν υπάρχει
+
+                alert("One or more of the recipients does not exist.");
+
+            });
+
+        }
+        
+        function SendButton() {
+            $('#sendForm').submit(function () { //κάθε φορά που πατάμε send για να σταλεί μήνυμα
+                if ($('#to').val()) { //αν το όνομα του αποστολέα έχει γραφτεί στην μπάρα
+                    selectedID = null;
+                    //γεμίζουμε τις μεταβλητές selectedUser και selectedID με βάση τον τοπικό πίνακα με τις συνομιλίες
+                    if ($('#to').val().includes(",")) { // Έλεγχοι για παραπάνω από έναν παραλήπτη
+                        var recipients = $('#to').val().split(",");
+
+                        var flag = false;
+
+                        for (var j = 0; j < usersList.length; j++) {
+                            if (usersList[j][0].length == recipients.length) {
+                                for (var i = 0; i < recipients.length; i++) {
+                                    if (usersList[j][0].includes(recipients[i])) {
+                                        if (i == recipients.length - 1) {
+                                            flag = true;
+                                            selectedID = usersList[j][1];
+                                        }
+                                    } else {
+                                        break;
+                                    }
+                                }
+                                if (flag == true) {
+                                    break;
+                                }
+                            }
+                        }
+                    } else { //Έλεγχοι για έναν παραλήπτη
+                        for (i = 0; i < usersList.length; i++) {
+                            if ($('#to').val() == usersList[i][0]) {
+                                selectedUser = usersList[i][0];
+                                selectedID = usersList[i][1];
+                            }
+                        }
+                    }
+                }
+
+                //αποστολή μηνύματος μαζί με άλλες πληροφορίες στον server
+                msg = { to: $('#to').val(), message: $('#m').val(), id: selectedID, "sender": sender };
+                socket.emit('message sent', msg);
+                $('#m').val('');
+                return false;
+            });
+
+        }
+
+        var usersList = [];
+
+        function GetUserInfo() { //Παίρνουμε ιστορικό συνομιλιών από τη βάση
+
+            var url = "http://" + IP + "/UI/GetUserInfo";
+
+            xhr.open('GET', url, true);
+
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState == 4 && xhr.status == 200) {
+
+                    var res = xhr.responseText;
+
+                    if (res == "error") {
+                        alert("An error occured please relog");
+                        document.location.href = "/";
+                    } else {
+                        res = JSON.parse(res);
+                        FillList(res); //εμφάνιση παλιών συνομιλιών στην οθόνη
+                        sender = res.username;
+                        socket(IP); // κάλεσμα socket functions
+                    }
+                }
+            };
+
+            xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+
+            xhr.send();
+        };
+
+        function FillList(response) { //μέθοδος που εμφανίζει στον χρήστη τις παλιές του συνομολίες μετά το Login
+
+            var list = null;
+            for (var i = 0; i < response.chats.length; i++) {
+                usersList.push([]);
+                //κόβουμε το όνομα του συνδεδεμένου χρήστη από τις συνομιλίες
+                list = response.chats[i].split(response.username);
+                list = list.toString();
+                list = list.split(",");
+                for (var j = 0; j < list.length; j++) {
+                    if (list[j] == "") {
+                        list.splice(j, 1);
+                        j--;
+                    }
+                }
+
+                //βάζουμε στον πίνακα την νέα λίστα με τις συνομιλίες και τα id
+                usersList[i].push(list);
+                usersList[i].push(response.id[i]);
+
+
+                //εμφάνιση στην οθόνη
+                var tr = document.createElement("TR");
+                var td = document.createElement("TD");
+                var p = document.createElement("P");
+                
+                 p.id = i;
+                p.innerHTML = list;
+
+                td.appendChild(p);
+                tr.appendChild(td);
+                document.getElementById("mytable").appendChild(tr);
+
+            }
+
+        }
+
+        function AppendChat(info) { // μεθοδος που προσθέτει στους πινακες τη νεα συνομιλια και το id της
+            usersList.push([]);
+            usersList[usersList.length - 1][0] = info.users.split(',');
+            usersList[usersList.length - 1][1] = info.id;
+            selectedUser = info.users;
+            selectedID = info.id;
+
+            //εμφανιση νέας συνομιλιας στην οθονη μαζι με τις παλιες
+            var tr = document.createElement("TR");
+            var td = document.createElement("TD");
+            var p = document.createElement("P");
+            p.id = usersList.length - 1;
+            p.innerHTML = info.users;
+
+            td.appendChild(p);
+            tr.appendChild(td);
+            document.getElementById("mytable").appendChild(tr);
+        }
+
+        // Επιλογη παραληπτη κανοντας click στη συνομιλια
+        document.getElementById("mytable").addEventListener("click", function (e) {
+
+            selectedUser = usersList[e.target.id][0];
+            selectedID = usersList[e.target.id][1];
+
+        });
+
+
+    </script>
+
+
+
+</body>
+
+
+</html>
